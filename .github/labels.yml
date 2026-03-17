@@ -1,0 +1,24 @@
+documentation:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ['**/*.md']
+
+harness:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ['**/agent-harness/**']
+
+code-quality:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ['**/*.py']
+
+compatibility:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ['**/cli-anything-plugin/**', '**/opencode-commands/**']
+
+bug:
+  - any:
+    - changed-files:
+      - any-glob-to-any-file: ['**/fix/**', '**/bugfix/**']
