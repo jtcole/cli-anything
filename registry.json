@@ -62,6 +62,20 @@
       "contributor_url": "https://github.com/HKUDS/CLI-Anything"
     },
     {
+      "name": "browser",
+      "display_name": "Browser",
+      "version": "1.0.0",
+      "description": "Browser automation via DOMShell MCP server. Maps Chrome's Accessibility Tree to a virtual filesystem for agent-native navigation.",
+      "requires": "Node.js, npx, Chrome + DOMShell extension",
+      "homepage": "https://github.com/apireno/DOMShell",
+      "install_cmd": "pip install git+https://github.com/HKUDS/CLI-Anything.git#subdirectory=browser/agent-harness",
+      "entry_point": "cli-anything-browser",
+      "skill_md": "browser/agent-harness/cli_anything/browser/skills/SKILL.md",
+      "category": "web",
+      "contributor": "furkankoykiran",
+      "contributor_url": "https://github.com/furkankoykiran"
+    },
+    {
       "name": "comfyui",
       "display_name": "ComfyUI",
       "version": "1.0.0",

@@ -18,6 +18,10 @@
 !/assets/
 !/.claude-plugin/
 !/.github/
+/.github/*
+!/.github/workflows/
+!/.github/scripts/
+!/.github/PULL_REQUEST_TEMPLATE.md
 
 # Step 3: Allow cli-anything-plugin, codex-skill, and skill_generation tests
 !/cli-anything-plugin/
@@ -42,6 +46,7 @@
 !/adguardhome/
 !/novita/
 !/ollama/
+!/browser/
 !/musescore/
 
 # Step 5: Inside each software dir, ignore everything (including dotfiles)
@@ -75,6 +80,8 @@
 /adguardhome/.*
 /ollama/*
 /ollama/.*
+/browser/*
+/browser/.*
 /musescore/*
 /musescore/.*
 
@@ -95,6 +102,7 @@
 !/adguardhome/agent-harness/
 !/novita/agent-harness/
 !/ollama/agent-harness/
+!/browser/agent-harness/
 !/musescore/agent-harness/
 
 # Step 7: Ignore build artifacts within allowed dirs
@@ -126,6 +134,7 @@ assets/gen_typing_gif.py
 !/docs/
 /docs/*
 !/docs/hub/
+/docs/hub/registry-dates.json
 !/notebooklm/
 /notebooklm/*
 /notebooklm/.*
