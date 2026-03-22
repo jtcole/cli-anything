@@ -53,6 +53,7 @@ class Session:
             self.undo_stack.append({
                 "description": description,
                 "data": copy.deepcopy(self.project_data),
+                "path": self.project_path,
             })
             self.redo_stack.clear()
             self.history.append(description)
@@ -66,8 +67,10 @@ class Session:
         self.redo_stack.append({
             "description": entry["description"],
             "data": copy.deepcopy(self.project_data),
+            "path": self.project_path,
         })
         self.project_data = entry["data"]
+        self.project_path = entry.get("path", self.project_path)
         self.modified = True
         return entry["description"]
 
@@ -79,8 +82,10 @@ class Session:
         self.undo_stack.append({
             "description": entry["description"],
             "data": copy.deepcopy(self.project_data),
+            "path": self.project_path,
         })
         self.project_data = entry["data"]
+        self.project_path = entry.get("path", self.project_path)
         self.modified = True
         return entry["description"]
 
