@@ -2,7 +2,7 @@
   "meta": {
     "repo": "https://github.com/HKUDS/CLI-Anything",
     "description": "CLI-Hub — Agent-native stateful CLI interfaces for softwares, codebases, and Web Services",
-    "updated": "2026-03-26"
+    "updated": "2026-03-29"
   },
   "clis": [
     {
@@ -382,6 +382,20 @@
       "category": "graphics",
       "contributor": "levishilf",
       "contributor_url": "https://github.com/levishilf"
+    },
+    {
+      "name": "clibrowser",
+      "display_name": "clibrowser",
+      "version": "0.1.0",
+      "description": "Zero-dependency CLI browser for AI agents with search, extraction, forms, RSS, crawling, auth, and WebMCP support",
+      "requires": "Rust toolchain (cargo) for source install, or manual binary download from GitHub Releases",
+      "homepage": "https://github.com/allthingssecurity/clibrowser",
+      "install_cmd": "cargo install --git https://github.com/allthingssecurity/clibrowser.git --tag v0.1.0 --locked",
+      "entry_point": "clibrowser",
+      "skill_md": null,
+      "category": "web",
+      "contributor": "allthingssecurity",
+      "contributor_url": "https://github.com/allthingssecurity"
     }
   ]
 }
