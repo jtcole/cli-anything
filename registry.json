@@ -522,6 +522,20 @@
       "category": "ai",
       "contributor": "Akabane71",
       "contributor_url": "https://github.com/Akabane71"
+    },
+    {
+      "name": "cloudanalyzer",
+      "display_name": "CloudAnalyzer",
+      "version": "1.0.0",
+      "description": "Point cloud and trajectory QA: Chamfer/AUC/F1, ATE/RPE/drift, ground segmentation metrics, config-driven quality gates, baseline evolution — harness wraps the CloudAnalyzer Python API",
+      "requires": "Python 3.10+; cloudanalyzer (`pip install cloudanalyzer`), Open3D for full IO/viewer paths",
+      "homepage": "https://github.com/rsasaki0109/CloudAnalyzer",
+      "install_cmd": "pip install git+https://github.com/HKUDS/CLI-Anything.git#subdirectory=cloudanalyzer/agent-harness",
+      "entry_point": "cli-anything-cloudanalyzer",
+      "skill_md": "cloudanalyzer/agent-harness/cli_anything/cloudanalyzer/skills/SKILL.md",
+      "category": "graphics",
+      "contributor": "rsasaki0109",
+      "contributor_url": "https://github.com/rsasaki0109"
     }
   ]
 }
