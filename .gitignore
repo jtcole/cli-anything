@@ -142,6 +142,8 @@
 /cloudcompare/.*
 /wiremock/*
 /wiremock/.*
+/exa/*
+/exa/.*
 
 # Step 6: ...except agent-harness/
 !/gimp/agent-harness/
@@ -176,6 +178,7 @@
 !/cloudcompare/agent-harness/
 !/wiremock/
 !/wiremock/agent-harness/
+!/exa/agent-harness/
 
 # Step 7: Ignore build artifacts within allowed dirs
 **/__pycache__/
@@ -211,3 +214,4 @@ assets/gen_typing_gif.py
 !/notebooklm/agent-harness/
 !/intelwatch/agent-harness/
 !/intelwatch/
+!/exa/
