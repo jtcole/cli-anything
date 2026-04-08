@@ -25,8 +25,10 @@ from cli_anything.shotcut.utils.mlt_xml import (
     create_blank_project, mlt_to_string, parse_mlt, write_mlt,
     get_property, set_property, get_main_tractor, get_tractor_tracks,
     get_all_producers, get_playlist_entries, find_element_by_id,
-    add_filter_to_element,
+    add_filter_to_element, add_track_to_tractor, add_entry_to_playlist,
+    add_blank_to_playlist,
 )
+from cli_anything.shotcut.utils.time import frames_to_timecode as _ftc
 
 
 # ============================================================================
@@ -688,6 +690,70 @@ class TestExport:
                 export_mod.render(s, tmpfile)
         finally:
             os.unlink(tmpfile)
+
+    def test_set_tractor_out_single_clip(self):
+        """_set_tractor_out sets tractor out to match a single clip duration."""
+        s = Session()
+        proj_mod.new_project(s, "hd1080p30")
+        tractor = get_main_tractor(s.root)
+        playlist_id, _ = add_track_to_tractor(s.root, tractor, "video", "V1")
+        playlist = find_element_by_id(s.root, playlist_id)
+
+        # Add a 6-second clip (frames 0–179 at 29.97fps ≈ 180 frames)
+        prod = s.root.makeelement("producer", {"id": "clip1"})
+        s.root.insert(0, prod)
+        add_entry_to_playlist(playlist, "clip1", "00:00:00.000", "00:00:05.999")
+
+        # Before fix: tractor out is still the initial value
+        assert tractor.get("out") == "00:00:00.000"
+
+        export_mod._set_tractor_out(s)
+
+        # After fix: tractor out should reflect the clip duration
+        assert tractor.get("out") != "00:00:00.000"
+        assert tractor.get("out") != "04:00:00.000"
+        # Background entry should be capped too
+        bg = find_element_by_id(s.root, "background")
+        bg_entry = bg.find("entry")
+        assert bg_entry.get("out") == tractor.get("out")
+        # Black producer should be capped
+        black = s.root.find(".//producer[@id='black']")
+        assert black.get("out") == tractor.get("out")
+
+    def test_set_tractor_out_multi_segment(self):
+        """_set_tractor_out sums entry spans and blanks across segments."""
+        s = Session()
+        proj_mod.new_project(s, "hd1080p30")
+        tractor = get_main_tractor(s.root)
+        pid, _ = add_track_to_tractor(s.root, tractor, "video", "V1")
+        playlist = find_element_by_id(s.root, pid)
+
+        # Two 3-second clips with a 1-second blank between
+        prod1 = s.root.makeelement("producer", {"id": "seg1"})
+        prod2 = s.root.makeelement("producer", {"id": "seg2"})
+        s.root.insert(0, prod1)
+        s.root.insert(0, prod2)
+        add_entry_to_playlist(playlist, "seg1", "00:00:00.000", "00:00:02.999")
+        add_blank_to_playlist(playlist, "00:00:01.000")
+        add_entry_to_playlist(playlist, "seg2", "00:00:00.000", "00:00:02.999")
+
+        export_mod._set_tractor_out(s)
+
+        # Tractor out should cover all segments + blank (~7 seconds)
+        out_tc = tractor.get("out")
+        assert out_tc != "00:00:00.000"
+        assert out_tc != "04:00:00.000"
+
+    def test_set_tractor_out_empty_timeline(self):
+        """_set_tractor_out is a no-op on a blank project with no clips."""
+        s = Session()
+        proj_mod.new_project(s, "hd1080p30")
+        tractor = get_main_tractor(s.root)
+
+        export_mod._set_tractor_out(s)
+
+        # No clips → tractor out should stay unchanged
+        assert tractor.get("out") == "00:00:00.000"
 
 
 # ============================================================================
