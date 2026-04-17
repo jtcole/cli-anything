@@ -6,6 +6,7 @@ import shutil
 from typing import Optional
 
 from ..utils import mlt_xml
+from ..utils.time import timecode_to_frames, frames_to_timecode
 from .session import Session
 
 
@@ -411,12 +412,67 @@ def render(session: Session, output_path: str,
                                    width, height)
 
 
+def _set_tractor_out(session: Session) -> None:
+    """Set tractor out= to actual timeline duration before passing to melt.
+
+    The tractor is created with out="00:00:00.000" and never updated as clips
+    are added. Without this fix, melt falls back to the longest track in the
+    multitrack — the 4-hour black background — and renders a 4-hour file.
+    """
+    profile = session.get_profile()
+    fps_num = int(profile.get("frame_rate_num", 30000))
+    fps_den = int(profile.get("frame_rate_den", 1001))
+
+    tractor = mlt_xml.get_main_tractor(session.root)
+    if tractor is None:
+        return
+
+    tracks = mlt_xml.get_tractor_tracks(tractor)
+    max_frames = 0
+    for te in tracks:
+        prod_id = te.get("producer", "")
+        if prod_id == "background":
+            continue
+        playlist = mlt_xml.find_element_by_id(session.root, prod_id)
+        if playlist is None:
+            continue
+        total = 0
+        for child in playlist:
+            if child.tag == "entry":
+                in_f = timecode_to_frames(child.get("in", "0"), fps_num, fps_den)
+                out_f = timecode_to_frames(child.get("out", "0"), fps_num, fps_den)
+                total += max(0, out_f - in_f + 1)
+            elif child.tag == "blank":
+                try:
+                    total += timecode_to_frames(child.get("length", "0"), fps_num, fps_den)
+                except Exception:
+                    pass
+        max_frames = max(max_frames, total)
+
+    if max_frames > 0:
+        out_tc = frames_to_timecode(max_frames - 1, fps_num, fps_den)
+        tractor.set("out", out_tc)
+        # Cap the background track to the same duration so melt doesn't
+        # extend the render to the 4-hour background default.
+        bg_playlist = mlt_xml.find_element_by_id(session.root, "background")
+        if bg_playlist is not None:
+            for entry in bg_playlist.findall("entry"):
+                entry.set("out", out_tc)
+        black_producer = session.root.find(".//producer[@id='black']")
+        if black_producer is not None:
+            black_producer.set("out", out_tc)
+
+
 def _render_with_melt(session: Session, output_path: str,
                       preset: dict, melt_path: str,
                       width: Optional[int], height: Optional[int],
                       extra_args: Optional[list[str]]) -> dict:
     """Render using melt command."""
     import tempfile
+
+    # Fix tractor out before rendering — without this melt renders the full
+    # 4-hour background track instead of the actual content duration.
+    _set_tractor_out(session)
 
     # Save project to temp file
     with tempfile.NamedTemporaryFile(suffix=".mlt", delete=False, mode="w") as f:
