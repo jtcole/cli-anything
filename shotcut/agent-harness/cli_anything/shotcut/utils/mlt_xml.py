@@ -23,8 +23,14 @@ def parse_mlt(filepath: str) -> etree._Element:
 
 
 def write_mlt(root: etree._Element, filepath: str) -> None:
-    """Write an MLT XML tree to a file."""
-    tree = etree.ElementTree(root)
+    """Write an MLT XML tree to a file.
+
+    Normalizes top-level producer ordering first so playlist entries never
+    forward-reference media producers that appear later in the document.
+    """
+    normalized_root = copy.deepcopy(root)
+    normalize_top_level_order(normalized_root)
+    tree = etree.ElementTree(normalized_root)
     tree.write(filepath, xml_declaration=True, encoding="utf-8",
                pretty_print=True)
 
@@ -174,6 +180,39 @@ def create_blank_project(profile: dict) -> etree._Element:
     return root
 
 
+def _first_playlist_or_tractor_index(root: etree._Element) -> int:
+    """Return the first top-level playlist/tractor index, or len(root)."""
+    for idx, child in enumerate(list(root)):
+        if child.tag in ("playlist", "tractor"):
+            return idx
+    return len(root)
+
+
+def insert_before_playlists_and_tractors(
+    root: etree._Element, element: etree._Element
+) -> None:
+    """Insert a top-level declaration before any playlists or tractors."""
+    root.insert(_first_playlist_or_tractor_index(root), element)
+
+
+def normalize_top_level_order(root: etree._Element) -> None:
+    """Move any late top-level producers ahead of playlists and tractors."""
+    late_producers = []
+    seen_playlist_or_tractor = False
+    for child in list(root):
+        if child.tag in ("playlist", "tractor"):
+            seen_playlist_or_tractor = True
+        elif child.tag == "producer" and seen_playlist_or_tractor:
+            late_producers.append(child)
+
+    for producer in late_producers:
+        root.remove(producer)
+
+    insert_idx = _first_playlist_or_tractor_index(root)
+    for offset, producer in enumerate(late_producers):
+        root.insert(insert_idx + offset, producer)
+
+
 def add_track_to_tractor(root: etree._Element, tractor: etree._Element,
                          track_type: str = "video",
                          name: str = "") -> tuple[str, str]:
@@ -290,13 +329,7 @@ def create_producer(root: etree._Element, resource: str,
     # Generate a UUID for clip tracking
     set_property(producer, "shotcut:uuid", str(uuid.uuid4()))
 
-    # Insert before the first tractor
-    tractors = root.findall("tractor")
-    if tractors:
-        tractor_idx = list(root).index(tractors[0])
-        root.insert(tractor_idx, producer)
-    else:
-        root.append(producer)
+    insert_before_playlists_and_tractors(root, producer)
 
     return producer
 

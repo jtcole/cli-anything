@@ -130,6 +130,40 @@ class TestMltXml:
         finally:
             os.unlink(tmpfile)
 
+    def test_write_mlt_normalizes_producer_order(self):
+        profile = {
+            "width": "1280", "height": "720",
+            "frame_rate_num": "24000", "frame_rate_den": "1001",
+            "sample_aspect_num": "1", "sample_aspect_den": "1",
+            "display_aspect_num": "16", "display_aspect_den": "9",
+            "progressive": "1", "colorspace": "709",
+        }
+        root = create_blank_project(profile)
+        late_producer = root.makeelement("producer", {"id": "late_producer"})
+        set_property(late_producer, "resource", "/tmp/fake.mp4")
+        set_property(late_producer, "mlt_service", "avformat")
+        root.append(late_producer)
+
+        with tempfile.NamedTemporaryFile(suffix=".mlt", delete=False) as f:
+            tmpfile = f.name
+
+        try:
+            write_mlt(root, tmpfile)
+            parsed = parse_mlt(tmpfile)
+            children = list(parsed)
+            first_playlist_or_tractor = min(
+                idx
+                for idx, child in enumerate(children)
+                if child.tag in ("playlist", "tractor")
+            )
+            late_idx = next(
+                idx for idx, child in enumerate(children)
+                if child.tag == "producer" and child.get("id") == "late_producer"
+            )
+            assert late_idx < first_playlist_or_tractor
+        finally:
+            os.unlink(tmpfile)
+
     def test_properties(self):
         from lxml import etree
         elem = etree.Element("producer")
@@ -422,6 +456,40 @@ class TestTimeline:
         finally:
             os.unlink(tmpfile)
 
+    def test_add_clip_at_time_uses_inclusive_duration(self):
+        s = self._make_session()
+        tl_mod.add_track(s, "video")
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(b"dummy")
+            tmpfile = f.name
+
+        try:
+            tl_mod.add_clip(
+                s,
+                tmpfile,
+                1,
+                in_point="00:00:00.000",
+                out_point="00:00:01.000",
+            )
+            next_start = frames_to_timecode(timecode_to_frames("00:00:01.000") + 1)
+            tl_mod.add_clip(
+                s,
+                tmpfile,
+                1,
+                in_point="00:00:01.001",
+                out_point="00:00:02.000",
+                at_time=next_start,
+            )
+
+            items = tl_mod.list_clips(s, 1)
+            blank_items = [item for item in items if item.get("type") == "blank"]
+            clip_items = [item for item in items if item.get("clip_index") is not None]
+            assert len(blank_items) == 0
+            assert len(clip_items) == 2
+        finally:
+            os.unlink(tmpfile)
+
     def test_remove_clip(self):
         s = self._make_session()
         tl_mod.add_track(s, "video")
@@ -474,13 +542,37 @@ class TestTimeline:
                             in_point="00:00:00.000", out_point="00:00:10.000")
             result = tl_mod.split_clip(s, 1, 0, "00:00:05.000")
             assert result["action"] == "split_clip"
-            assert result["first_clip"]["out"] == "00:00:05.000"
+            expected_first_out = frames_to_timecode(timecode_to_frames("00:00:05.000") - 1)
+            assert result["first_clip"]["out"] == expected_first_out
             assert result["second_clip"]["in"] == "00:00:05.000"
 
             # Should now have 2 clips
             clips = tl_mod.list_clips(s, 1)
             clip_entries = [c for c in clips if c.get("clip_index") is not None]
             assert len(clip_entries) == 2
+        finally:
+            os.unlink(tmpfile)
+
+    def test_remove_clip_without_ripple_preserves_inclusive_duration(self):
+        s = self._make_session()
+        tl_mod.add_track(s, "video")
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+            f.write(b"dummy")
+            tmpfile = f.name
+
+        try:
+            tl_mod.add_clip(
+                s,
+                tmpfile,
+                1,
+                in_point="00:00:00.000",
+                out_point="00:00:01.000",
+            )
+            tl_mod.remove_clip(s, 1, 0, ripple=False)
+            items = tl_mod.list_clips(s, 1)
+            blank = next(item for item in items if item.get("type") == "blank")
+            assert parse_time_input(blank["length"]) == timecode_to_frames("00:00:01.000") + 1
         finally:
             os.unlink(tmpfile)
 

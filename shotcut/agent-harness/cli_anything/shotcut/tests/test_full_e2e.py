@@ -11,7 +11,9 @@ import json
 import copy
 import tempfile
 import shutil
+import subprocess
 import pytest
+from PIL import Image, ImageStat
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -324,7 +326,7 @@ class TestTimelineClips:
         result = tl_mod.split_clip(session, 1, 0, "00:00:05.000")
 
         assert result["first_clip"]["in"] == "00:00:00.000"
-        assert result["first_clip"]["out"] == "00:00:05.000"
+        assert result["first_clip"]["out"] == frames_to_timecode(parse_time_input("00:00:05.000") - 1)
         assert result["second_clip"]["in"] == "00:00:05.000"
         assert result["second_clip"]["out"] == "00:00:10.000"
 
@@ -1360,6 +1362,40 @@ class TestMeltRenderE2E:
             size = os.path.getsize(output_path)
             assert size > 0
             print(f"\n  MLT XML render: {output_path} ({size:,} bytes)")
+
+    def test_render_imported_media_is_not_black(self, video):
+        """Imported media should render real picture content, not a black frame."""
+        if shutil.which("ffmpeg") is None:
+            pytest.skip("ffmpeg is required for frame extraction")
+
+        s = Session()
+        proj_mod.new_project(s, "hd1080p30")
+        tl_mod.add_track(s, "video", "V1")
+        tl_mod.add_clip(s, video, 1, "00:00:00.000", "00:00:01.000")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = os.path.join(tmp_dir, "render.mp4")
+            frame_path = os.path.join(tmp_dir, "frame.png")
+
+            result = export_mod.render(s, output_path, "default", overwrite=True)
+            assert result["method"] == "melt"
+            assert os.path.exists(output_path)
+
+            subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-ss", "00:00:00.500",
+                    "-i", output_path,
+                    "-frames:v", "1",
+                    frame_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            mean = ImageStat.Stat(Image.open(frame_path).convert("RGB")).mean
+            assert max(mean) > 5, f"Rendered frame appears black: {mean}"
 
 
 if __name__ == "__main__":

@@ -40,7 +40,11 @@ def _entry_duration_frames(session: Session, entry: dict) -> int:
     out_point = entry.get("out")
     if not out_point:
         raise RuntimeError("Absolute timeline placement requires clips with finite out points")
-    return parse_time_input(out_point, fps_num, fps_den) - parse_time_input(in_point, fps_num, fps_den)
+    return (
+        parse_time_input(out_point, fps_num, fps_den)
+        - parse_time_input(in_point, fps_num, fps_den)
+        + 1
+    )
 
 
 def _absolute_insertion_point(
@@ -312,7 +316,7 @@ def remove_clip(session: Session, track_index: int, clip_index: int,
                     fps_num, fps_den = _get_fps(session)
                     in_frames = parse_time_input(in_tc, fps_num, fps_den)
                     out_frames = parse_time_input(out_tc, fps_num, fps_den)
-                    duration_frames = out_frames - in_frames
+                    duration_frames = out_frames - in_frames + 1
                     if duration_frames > 0:
                         duration_tc = frames_to_timecode(duration_frames, fps_num, fps_den)
                         blank = etree.Element("blank")
@@ -454,9 +458,20 @@ def split_clip(session: Session, track_index: int, clip_index: int,
                 old_out = child.get("out")
                 if old_out is None:
                     raise RuntimeError("Cannot split clip without out point")
+                fps_num, fps_den = _get_fps(session)
+                old_in_frames = parse_time_input(old_in, fps_num, fps_den)
+                old_out_frames = parse_time_input(old_out, fps_num, fps_den)
+                split_frames = parse_time_input(at, fps_num, fps_den)
+                if split_frames <= old_in_frames:
+                    raise ValueError("Split point must be after the clip in point")
+                if split_frames > old_out_frames:
+                    raise ValueError("Split point must not exceed the clip out point")
 
-                # First part: original in → split point
-                child.set("out", at)
+                first_out = frames_to_timecode(split_frames - 1, fps_num, fps_den)
+
+                # MLT uses inclusive out-points, so the first half must end on
+                # the frame immediately before the split point.
+                child.set("out", first_out)
 
                 # Second part: split point → original out
                 # Create a copy of the producer
@@ -470,10 +485,9 @@ def split_clip(session: Session, track_index: int, clip_index: int,
                 mlt_xml.set_property(new_producer, "shotcut:uuid",
                                      __import__("uuid").uuid4().hex)
 
-                # Insert producer in document
-                tractor = session.get_main_tractor()
-                tractor_idx = list(session.root).index(tractor)
-                session.root.insert(tractor_idx, new_producer)
+                # Insert producer ahead of all playlists/tractors so written
+                # MLT never forward-references media producers.
+                mlt_xml.insert_before_playlists_and_tractors(session.root, new_producer)
 
                 # Insert new entry after current one
                 new_entry = etree.Element("entry")
@@ -491,7 +505,7 @@ def split_clip(session: Session, track_index: int, clip_index: int,
                     "track_index": track_index,
                     "clip_index": clip_index,
                     "at": at,
-                    "first_clip": {"producer": producer_id, "in": old_in, "out": at},
+                    "first_clip": {"producer": producer_id, "in": old_in, "out": first_out},
                     "second_clip": {"producer": new_prod_id, "in": at, "out": old_out},
                 }
             entry_count += 1
