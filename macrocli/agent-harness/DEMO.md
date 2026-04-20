@@ -1,74 +1,125 @@
 # MacroCLI Demo — gedit 完整测试方案
 
-> **注意事项（测试前必读）**
-> - 所有命令在**桌面终端**里跑，不能是 SSH 无头会话（需要 `$DISPLAY`）
-> - `gedit_save_as` 用的菜单路径是 `[File, Save As...]`，如果你的 gedit 版本菜单文字不同（比如无省略号），需要改 yaml 里的 `menu_path`
-> - 录制完的宏用 `--macro-file /path/to/xxx.yaml` 直接指定，无需注册到 manifest
-> - 如果 AT-SPI 不可用（`semantic_ui available: false`），`menu_click` 步骤会失败，改用 `hotkey` 替代
-
-## 目标
-
-在 Linux 桌面机上，用 **gedit**（文本编辑器）演示 MacroCLI 的三条核心路径：
-
-1. **手写宏** — 用已有的 YAML 宏定义执行 GUI 操作
-2. **录制宏** — 操作一次 gedit，自动生成宏 YAML
-3. **Gemini 辅助生成**（可选，需 API Key）
+本文档记录 MacroCLI 在 **Linux 无头服务器 + Xvfb + noVNC** 环境下的完整测试过程，
+包括虚拟桌面搭建、VNC 远程查看、宏执行和录制回放的全链路验证。
 
 ---
 
-## 第一步：环境准备
+## 环境架构
 
-在你的 Linux 桌面机上执行：
+```
+本地浏览器
+    │  SSH 隧道 (16080 → 16080)
+    ▼
+远程 Linux 服务器
+    │
+    ├─ Xvfb :99         虚拟显示器 1920x1080
+    ├─ openbox          窗口管理器
+    ├─ x11vnc           VNC 服务 (只监听 localhost:5900)
+    ├─ websockify       WebSocket → VNC 代理 (16080)
+    └─ gedit            被操控的 GUI 应用
+```
+
+---
+
+## 第一步：安装依赖
 
 ```bash
-# 1. 安装 gedit（如果没有）
-sudo apt install gedit          # Ubuntu/Debian
-# sudo dnf install gedit        # Fedora
-# sudo pacman -S gedit          # Arch
+# 虚拟显示器和 VNC
+sudo apt install xvfb x11vnc openbox xdotool wmctrl
 
-# 2. 安装 MacroCLI 系统依赖
-sudo apt install xdotool wmctrl python3-pyatspi
+# GUI 应用（demo 目标）
+sudo apt install gedit
 
-# 3. 克隆仓库 / 进入已有目录
-cd ~/CLI-Anything-with-GUI-Macro-System-/macrocli/agent-harness
+# noVNC（浏览器查看桌面）
+sudo apt install novnc websockify
 
-# 4. 创建专用 conda 环境（或用已有的）
-conda create -n macrocli python=3.11 -y
-conda activate macrocli
+# AT-SPI 语义控制（可选，GTK 应用）
+sudo apt install python3-pyatspi
 
-# 5. 安装 MacroCLI 及可视化依赖
-pip install -e ".[visual]"
-# 等价于：pip install -e . mss Pillow numpy pynput
+# MacroCLI Python 依赖
+conda activate macrocli   # 或你的环境名
+pip install -e "path/to/macrocli/agent-harness[visual]"
+# 等价于: pip install mss Pillow numpy pynput
+```
 
-# 6. 验证安装
-cli-anything-macrocli macro list
+---
+
+## 第二步：启动虚拟桌面
+
+```bash
+# 1. 启动 Xvfb 虚拟显示器（:99 号，1920x1080 24位色）
+Xvfb :99 -screen 0 1920x1080x24 -ac &
+
+# 2. 设置 DISPLAY（后续所有命令都需要）
+export DISPLAY=:99
+
+# 3. 启动窗口管理器（让窗口能正常显示和拖动）
+openbox &
+
+# 4. 设置桌面背景色（避免纯黑）
+xsetroot -solid gray
+
+# 5. 启动 VNC 服务，只监听本地，允许多连接
+x11vnc -display :99 -nopw -listen localhost -rfbport 5900 \
+    -forever -shared -bg -o /tmp/x11vnc.log
+
+# 6. 启动 noVNC websocket 代理
+websockify --web /usr/share/novnc 16080 localhost:5900 &
+
+# 验证服务启动
+ss -tlnp | grep -E "5900|16080"
 ```
 
 期望输出：
 ```
-Available macros (7):
-  export_file          Export a file from the target application...
-  gedit_find_and_replace  Open Find & Replace in gedit...
-  gedit_new_window     Open a new gedit window...
-  gedit_save_as        Save the current gedit document...
-  gedit_type_and_save  Type a line of text into gedit and save...
-  transform_json       Read a JSON file, set a nested key...
-  undo_last            Trigger an undo operation...
+LISTEN  127.0.0.1:5900   ← x11vnc
+LISTEN  0.0.0.0:16080    ← websockify
 ```
 
 ---
 
-## 第二步：检查后端可用性
+## 第三步：连接 VNC 查看桌面
+
+在**本地机器**开 SSH 隧道：
 
 ```bash
+ssh -L 16080:localhost:16080 user@your-server -N
+```
+
+然后浏览器访问：
+
+```
+http://localhost:16080/vnc.html
+```
+
+点击 **Connect**，无需密码，即可看到虚拟桌面。
+
+> **注意：** 如果 Connect 后显示"连接已中断"，通常是 x11vnc 的客户端连接数超限。
+> 重启 x11vnc 并加 `-shared` 参数即可：
+> ```bash
+> pkill x11vnc
+> x11vnc -display :99 -nopw -listen localhost -rfbport 5900 -forever -shared -bg
+> ```
+
+---
+
+## 第四步：检查后端可用性
+
+```bash
+export DISPLAY=:99
+conda activate macrocli
+cd path/to/macrocli/agent-harness
+
 cli-anything-macrocli --json backends
 ```
 
-期望（在桌面机上）：
+期望输出（所有后端 available: true）：
+
 ```json
 {
   "native_api":    { "available": true,  "priority": 100 },
-  "gui_macro":     { "available": false, "priority": 80  },
+  "gui_macro":     { "available": true,  "priority": 80  },
   "visual_anchor": { "available": true,  "priority": 75  },
   "file_transform":{ "available": true,  "priority": 70  },
   "semantic_ui":   { "available": true,  "priority": 50  },
@@ -76,286 +127,272 @@ cli-anything-macrocli --json backends
 }
 ```
 
-> `visual_anchor` 需要 `mss Pillow numpy pynput` 全部安装  
-> `semantic_ui` 需要 `xdotool` 或 `python3-pyatspi`
-
 ---
 
-## Demo A：手写宏执行（semantic_ui + visual_anchor）
+## Demo A：手写宏执行
 
-### A1. 打开 gedit（native_api 宏）
+### A1. 打开 gedit
 
 ```bash
-# 干跑确认参数正确
-cli-anything-macrocli --dry-run --json macro run gedit_new_window
-
-# 正式执行：打开一个新 gedit 窗口
 cli-anything-macrocli --json macro run gedit_new_window
 ```
 
-gedit 窗口应在 3 秒内弹出。
+VNC 里能看到 gedit 窗口弹出。
 
-### A2. 在 gedit 里输入文字并保存（semantic_ui + visual_anchor）
-
-```bash
-# 在已打开的 gedit 里输入文字并 Ctrl+S 保存
-cli-anything-macrocli --json macro run gedit_type_and_save \
-    --param "text=Hello from MacroCLI! 🎉"
+输出示例：
+```json
+{
+  "success": true,
+  "telemetry": { "duration_ms": 39, "backends_used": ["native_api", "semantic_ui"] }
+}
 ```
 
-观察：光标出现在 gedit，逐字输入，然后触发保存。
+> **实现细节：** `gedit_new_window` 用 `native_api` 的 `start_process` action 后台
+> 启动 gedit（不等待进程退出），然后 `semantic_ui` 的 `wait_for_window` 等待窗口出现。
 
-### A3. 另存为指定路径（menu_click + wait_for_window）
+### A2. 输入文字并保存
+
+```bash
+cli-anything-macrocli --json macro run gedit_type_and_save \
+    --param "text=Hello from MacroCLI!"
+```
+
+VNC 里能看到文字逐字输入到 gedit，然后触发 Ctrl+S。
+
+输出示例：
+```json
+{
+  "success": true,
+  "steps": [
+    { "backend_used": "semantic_ui",   "output": {"focused": "gedit", "method": "wmctrl"} },
+    { "backend_used": "visual_anchor", "output": {"typed": 20} },
+    { "backend_used": "visual_anchor", "output": {"hotkey": "ctrl+s"} }
+  ],
+  "telemetry": { "duration_ms": 774 }
+}
+```
+
+> **实现细节：** 三个后端串联——`semantic_ui` 用 wmctrl 聚焦窗口，`visual_anchor`
+> 用 pynput 注入键盘事件，`visual_anchor` 发送 Ctrl+S 快捷键。
+
+### A3. 另存为指定路径
 
 ```bash
 cli-anything-macrocli --json macro run gedit_save_as \
     --param output_path=/tmp/macrocli_demo.txt
 ```
 
-观察：
-1. `File > Save As...` 菜单被自动点击
-2. 等待对话框出现
-3. 路径被输入，回车确认
-4. 后置条件验证 `/tmp/macrocli_demo.txt` 存在
+执行过程（可在 VNC 观察）：
+1. Ctrl+Shift+S 弹出 Save As 对话框
+2. Ctrl+L 打开路径输入框
+3. Ctrl+A 清空已有内容
+4. 输入 `/tmp/macrocli_demo.txt`
+5. Enter 确认
 
-验证结果：
 ```bash
+# 验证文件已创建
 cat /tmp/macrocli_demo.txt
 ```
 
-### A4. 查找替换（hotkey + type_text）
-
-```bash
-cli-anything-macrocli --json macro run gedit_find_and_replace \
-    --param find_text=Hello \
-    --param replace_text=Hi
-```
-
-观察：`Ctrl+H` 弹出对话框，自动填写两个字段，执行 Replace All，关闭。
-
 ---
 
-## Demo B：录制宏（自动生成）
+## Demo B：录制宏（核心功能）
 
-这个演示"录制一次，以后可以重复调用"。
+录制功能把一次手工操作自动转成可重复调用的宏。
+
+### 录制原理
+
+```
+用户操作 GUI
+    │
+pynput 监听鼠标键盘事件
+    │
+每次点击：
+  xdotool getwindowfocus → 获取焦点窗口名称和位置
+  计算点击在窗口内的百分比坐标 (x_pct, y_pct)
+  → 生成 click_relative 步骤（窗口锚点，不依赖绝对坐标）
+    │
+键盘输入：
+  累积字符（含空格）→ 生成 type_text 步骤
+  快捷键组合 → 生成 hotkey 步骤
+    │
+Ctrl+Alt+S 停止录制
+    │
+自动写出 YAML 宏文件
+```
+
+**为什么用窗口锚点而不是绝对坐标：**
+点击空白文本区会截到全白图片，模板匹配无法识别。改用窗口相对坐标
+（`click_relative`），回放时先找到窗口位置，再按百分比算出实际坐标，
+窗口移动到任何地方都能正确点击。
+
+### 录制操作
 
 ```bash
-# 1. 开始录制，给宏命名 my_gedit_workflow
-cli-anything-macrocli macro record my_gedit_workflow \
-    --output-dir /tmp/macrocli_recording
+# 开始录制，命名为 my_workflow
+cli-anything-macrocli macro record my_workflow \
+    --output-dir /tmp/my_recording \
+    --timeout 30    # 30秒后自动停止，或手动 Ctrl+Alt+S
 ```
 
 终端显示：
 ```
-Recording 'my_gedit_workflow'. Press Ctrl+Alt+S to stop.
+Recording 'my_workflow'. Press Ctrl+Alt+S to stop.
+[recorder] Recording 'my_workflow'. Press Ctrl+Alt+S to stop.
 ```
 
-**现在手动操作 gedit**（录制器会捕获这些动作）：
-1. 点击 gedit 文本区
-2. 输入几个字
-3. 按 `Ctrl+S`
-4. 点击菜单 `File`
-5. 点击 `Save As`
-6. 输入文件名
-7. 按回车
+**现在操作 gedit（录制器会捕获这些动作）：**
+1. 在 VNC 里点击 gedit 文本区
+2. 输入一段文字
+3. 按 Ctrl+S 保存
 
-**停止录制：**
-```
-Ctrl+Alt+S
-```
+按 Ctrl+Alt+S 停止（或等待超时），自动生成：
 
-录制结束，自动生成：
 ```
-/tmp/macrocli_recording/
-├── my_gedit_workflow.yaml        ← 宏定义文件
-└── my_gedit_workflow_templates/
-    ├── step_001_click.png        ← 每个点击的截图模板
-    ├── step_002_click.png
-    └── ...
+/tmp/my_recording/
+├── my_workflow.yaml              ← 宏定义文件
+└── my_workflow_templates/        ← 有特征区域的截图模板
+    └── step_001_click.png        ← 若点击区域有特征才会保存
 ```
 
-查看生成的宏：
-```bash
-cat /tmp/macrocli_recording/my_gedit_workflow.yaml
+生成的 YAML 示例：
 
-# 或直接查 info（用 --macro-file）
-cli-anything-macrocli --json macro run my_gedit_workflow \
-    --macro-file /tmp/macrocli_recording/my_gedit_workflow.yaml --dry-run
-```
-
-重放录制的宏：
-```bash
-# 用 --macro-file 直接指定 yaml 文件，无需注册到 manifest
-cli-anything-macrocli --json macro run my_gedit_workflow \
-    --macro-file /tmp/macrocli_recording/my_gedit_workflow.yaml
-```
-
----
-
-## Demo C：Gemini 辅助生成（可选）
-
-需要 Gemini API Key（免费额度够用）：
-获取地址：https://aistudio.google.com/app/apikey
-
-```bash
-# 安装 Gemini 依赖
-pip install google-generativeai
-
-# 打开 gedit，然后截图分析
-cli-anything-macrocli macro assist gedit_close_tab \
-    --goal "Close the current tab in gedit without saving" \
-    --screenshot current \
-    --api-key $GEMINI_API_KEY \
-    --output /tmp/gedit_close_tab.yaml
-```
-
-输出示例：
-```
-Sending screenshot to Gemini (gemini-1.5-flash)...
-✓ Generated 3 steps → /tmp/gedit_close_tab.yaml
-
-  Templates to capture (use 'macro capture-template'):
-    templates/001_wait_image.png: Close button in the tab bar
-```
-
-查看生成结果：
-```bash
-cat /tmp/gedit_close_tab.yaml
-```
-
----
-
-## Demo D：模板截图（visual_anchor 基础）
-
-这演示如何为 `click_image` 创建模板。
-
-```bash
-# 1. 打开 gedit，定位"New"按钮的屏幕坐标（用鼠标悬停或 xdotool）
-# 假设 New 按钮在 (120, 55)，大小约 40x30
-
-# 2. 截取模板
-cli-anything-macrocli macro capture-template \
-    templates/gedit_new_button.png \
-    --x 100 --y 40 --width 60 --height 40
-
-# 3. 写一个使用该模板的宏
-cat > /tmp/gedit_click_new.yaml << 'EOF'
-name: gedit_click_new
-version: "1.0"
-description: Click the New button in gedit toolbar.
+```yaml
+name: my_workflow
 steps:
-  - id: click_new
+  - id: step_001_click
     backend: visual_anchor
-    action: click_image
+    action: click_relative         # 窗口锚点，不是绝对坐标
     params:
-      template: templates/gedit_new_button.png
-      confidence: 0.85
-      timeout_ms: 3000
-EOF
+      window_title: gedit          # 从 xdotool getwindowfocus 获取
+      x_pct: 0.35                  # 点击位置在窗口宽度的 35%
+      y_pct: 0.33                  # 点击位置在窗口高度的 33%
 
-# 4. 执行（在 gedit 窗口上测试）
-cli-anything-macrocli macro run gedit_click_new \
-    --macro-file /tmp/gedit_click_new.yaml --json
+  - id: step_002_type
+    backend: visual_anchor
+    action: type_text
+    params:
+      text: hello world            # 空格正确合并（不再被切成 hotkey）
+
+  - id: step_003_hotkey
+    backend: visual_anchor
+    action: hotkey
+    params:
+      keys: ctrl+s
+```
+
+### 回放录制的宏
+
+```bash
+# 先清空 gedit 内容
+# 然后回放
+cli-anything-macrocli --json macro run my_workflow \
+    --macro-file /tmp/my_recording/my_workflow.yaml
+```
+
+实际测试输出：
+```json
+{
+  "success": true,
+  "telemetry": {
+    "duration_ms": 486,
+    "steps_run": 3,
+    "backends_used": ["visual_anchor"]
+  }
+}
+```
+
+VNC 截图验证（`hello world` 出现在 gedit）：
+
+```
+gedit 窗口标题: macrocli_test_final.txt (/tmp) - gedit
+内容: hello world
+状态: 已保存（标题栏无 * 号）
 ```
 
 ---
 
-## 完整自动化测试脚本
+## Demo C：transform_json（file_transform 后端）
 
-把上面的步骤串成一个脚本，验证全链路：
+> ⚠️ **未在本次测试中验证，仅供参考。**
+
+不需要 GUI，直接操作 JSON 文件：
 
 ```bash
-#!/bin/bash
-# demo_test.sh — MacroCLI gedit 完整链路测试
+# 创建测试文件
+echo '{"app": "draw.io", "version": 1}' > /tmp/config.json
 
-set -e
-echo "=== MacroCLI Demo Test ==="
+# 用宏修改嵌套 key
+cli-anything-macrocli --json macro run transform_json \
+    --param file=/tmp/config.json \
+    --param key=settings.theme \
+    --param value=dark
 
-# 确保没有旧的 gedit 残留
-pkill gedit 2>/dev/null || true
-sleep 0.5
-
-echo ""
-echo "--- Step 1: Open gedit ---"
-cli-anything-macrocli --json macro run gedit_new_window
-sleep 1.5
-
-echo ""
-echo "--- Step 2: Type text ---"
-cli-anything-macrocli --json macro run gedit_type_and_save \
-    --param "text=MacroCLI demo: $(date)"
-sleep 0.5
-
-echo ""
-echo "--- Step 3: Save As ---"
-OUTPUT=/tmp/macrocli_demo_$(date +%s).txt
-cli-anything-macrocli --json macro run gedit_save_as \
-    --param output_path="$OUTPUT"
-sleep 0.5
-
-echo ""
-echo "--- Step 4: Verify output ---"
-echo "File content:"
-cat "$OUTPUT"
-echo ""
-echo "File size: $(wc -c < $OUTPUT) bytes"
-
-echo ""
-echo "--- Step 5: Find & Replace ---"
-cli-anything-macrocli --json macro run gedit_find_and_replace \
-    --param find_text=MacroCLI \
-    --param replace_text=MacroCLI✓
-sleep 0.5
-
-echo ""
-echo "=== All steps passed ==="
-```
-
-运行：
-```bash
-chmod +x demo_test.sh
-./demo_test.sh
+# 验证
+cat /tmp/config.json
+# {"app": "draw.io", "version": 1, "settings": {"theme": "dark"}}
 ```
 
 ---
 
 ## 常见问题
 
-**Q: `semantic_ui` 报 "xdotool not found"**
+**Q: `macro run gedit_new_window` 超时 30 秒**
+
+原因：`run_command` 会等待进程退出，GUI 应用永远不会退出。
+解决：改用 `start_process` action（本项目已修复）。
+
+**Q: `wait_for_window` 找不到窗口**
+
+原因：`conda run` 会清除 `DISPLAY` 环境变量。
+解决：激活 conda 环境后直接运行，不要用 `conda run`：
 ```bash
-sudo apt install xdotool
+conda activate macrocli
+export DISPLAY=:99
+cli-anything-macrocli ...
 ```
 
-**Q: `menu_click` 报 "AT-SPI application not found"**
+**Q: VNC Connect 后显示"连接已中断"**
+
+原因：x11vnc 默认不允许多个客户端同时连接。
+解决：重启 x11vnc 并加 `-shared`：
 ```bash
-sudo apt install python3-pyatspi
-# 然后重启 gedit（需要 AT-SPI 服务在启动时就运行）
+pkill x11vnc
+x11vnc -display :99 -nopw -listen localhost -rfbport 5900 -forever -shared -bg
 ```
 
-**Q: `visual_anchor` 报 "no display"**
-- 确认在桌面终端（不是 SSH）里运行
-- 或设置 `export DISPLAY=:0`
+**Q: 录制回放时点击位置不准**
 
-**Q: 录制时 Ctrl+Alt+S 没反应**
-- 确认焦点在终端而不是 gedit
-- 或用 `--timeout 30`（30 秒后自动停止）
+原因：窗口大小与录制时不同，百分比坐标偏移。
+解决：确保回放时窗口大小与录制时一致，或调整宏里的 `x_pct`/`y_pct`。
 
-**Q: 模板匹配失败（confidence 太高）**
-```yaml
-# 把 confidence 调低
-confidence: 0.70   # 默认 0.85
-```
+**Q: 模板图全白，click_image 永远超时**
+
+原因：点击了空白区域（如文本编辑区），截图无特征。
+解决：录制器已自动检测低方差图片，改用 `click_relative` 替代。
 
 ---
 
-## 下一步：对接更复杂的应用
+## 验证结果汇总
 
-同样的流程适用于任何 GUI 应用：
+| 宏 | 后端 | 结果 | 耗时 |
+|----|------|------|------|
+| `gedit_new_window` | native_api + semantic_ui | ✓ | ~40ms |
+| `gedit_type_and_save` | semantic_ui + visual_anchor | ✓ | ~774ms |
+| `gedit_save_as` | semantic_ui + visual_anchor | ✓ | ~1847ms |
+| `transform_json` | file_transform | ⚠️ 未验证 | — |
+| `macro record` + 回放 | visual_anchor | ✓ | ~486ms |
 
-| 应用 | 推荐后端 | 备注 |
+---
+
+## 对接其他应用
+
+同样的流程适用于任何 Linux GUI 应用：
+
+| 应用 | 推荐后端 | 说明 |
 |------|----------|------|
-| Inkscape | `native_api` (`--actions`) + `semantic_ui` | 原生 CLI 支持很好 |
-| GIMP | `native_api` (Script-Fu) | 有完整脚本接口 |
-| LibreOffice | `native_api` (`--headless`) + `semantic_ui` | UNO API |
-| draw.io | `file_transform` + `visual_anchor` | XML 格式，可直接改文件 |
-| 无 CLI 的应用 | `macro record` + `visual_anchor` | 录制一次，模板匹配回放 |
+| Inkscape | `native_api` (`--actions`) | 有完整命令行接口 |
+| GIMP | `native_api` (Script-Fu) | 脚本接口强大 |
+| LibreOffice | `native_api` (`--headless`) | UNO API |
+| draw.io | `file_transform` + `visual_anchor` | XML 格式可直接编辑 |
+| 任意 GUI 应用 | `macro record` + `visual_anchor` | 录制一次，窗口锚点回放 |
