@@ -22,7 +22,7 @@ from cli_anything.unrealinsights.core.capture import (
     stop_capture,
 )
 from cli_anything.unrealinsights.core.export import execute_export, execute_response_file
-from cli_anything.unrealinsights.core.session import UnrealInsightsSession
+from cli_anything.unrealinsights.core.session import UnrealInsightsSession, state_dir
 from cli_anything.unrealinsights.utils.errors import handle_error
 from cli_anything.unrealinsights.utils.output import format_size, output_json
 from cli_anything.unrealinsights.utils.unrealinsights_backend import (
@@ -666,7 +666,7 @@ def repl(ctx):
     _repl_mode = True
 
     session = _get_session(ctx)
-    skin = ReplSkin("unrealinsights", version=__version__)
+    skin = ReplSkin("unrealinsights", version=__version__, history_file=str(state_dir() / "history"))
     skin.print_banner()
     pt_session = skin.create_prompt_session()
 

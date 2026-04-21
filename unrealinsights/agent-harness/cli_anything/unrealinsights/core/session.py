@@ -16,7 +16,7 @@ def _normalize_path(path: str | None) -> str | None:
     return str(Path(path).expanduser().resolve()) if path else None
 
 
-def _state_dir() -> Path:
+def state_dir() -> Path:
     override = os.environ.get("CLI_ANYTHING_UNREALINSIGHTS_STATE_DIR", "").strip()
     base = Path(override).expanduser() if override else Path.home() / ".cli-anything-unrealinsights"
     base.mkdir(parents=True, exist_ok=True)
@@ -24,7 +24,7 @@ def _state_dir() -> Path:
 
 
 def _state_file() -> Path:
-    return _state_dir() / "session.json"
+    return state_dir() / "session.json"
 
 
 @dataclass
