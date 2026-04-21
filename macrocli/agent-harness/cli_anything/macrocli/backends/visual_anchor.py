@@ -321,6 +321,8 @@ class VisualAnchorBackend(Backend):
             "type_text":      self._type_text,
             "hotkey":         self._hotkey,
             "scroll":         self._scroll,
+            "drag":           self._drag,
+            "drag_relative":  self._drag_relative,
             "capture_region": self._capture_region,
         }
 
@@ -532,6 +534,91 @@ class VisualAnchorBackend(Backend):
 
         return {"scrolled_at": [cx, cy], "dx": dx, "dy": dy}
 
+    def _drag(self, p: dict, context: BackendContext) -> dict:
+        """Drag from one template image to another (or to absolute coords).
+
+        Params:
+          from_template:  path to template image for drag start (optional)
+          to_template:    path to template image for drag end (optional)
+          from_x / from_y: fallback absolute coords if no from_template
+          to_x   / to_y:   fallback absolute coords if no to_template
+          button:          left | right | middle (default left)
+          duration_ms:     how long to hold during drag (default 200)
+          confidence:      template match threshold (default 0.85)
+          timeout_ms:      how long to wait for templates (default 5000)
+        """
+        button = p.get("button", "left")
+        duration_ms = int(p.get("duration_ms", 200))
+        confidence = float(p.get("confidence", 0.85))
+        timeout_ms = int(p.get("timeout_ms", 5000))
+
+        # Resolve start position
+        from_tmpl = p.get("from_template", "")
+        if from_tmpl and Path(from_tmpl).is_file():
+            tmpl = _load_image_as_array(from_tmpl)
+            match = _wait_for_template(tmpl, confidence, timeout_ms)
+            if match is None:
+                raise RuntimeError(f"drag: from_template not found: {from_tmpl}")
+            fx, fy = match[0], match[1]
+        else:
+            fx = int(p.get("from_x", 0))
+            fy = int(p.get("from_y", 0))
+
+        # Resolve end position
+        to_tmpl = p.get("to_template", "")
+        if to_tmpl and Path(to_tmpl).is_file():
+            tmpl = _load_image_as_array(to_tmpl)
+            match = _wait_for_template(tmpl, confidence, timeout_ms)
+            if match is None:
+                raise RuntimeError(f"drag: to_template not found: {to_tmpl}")
+            tx, ty = match[0], match[1]
+        else:
+            tx = int(p.get("to_x", fx))
+            ty = int(p.get("to_y", fy))
+
+        _mouse_drag(fx, fy, tx, ty, button=button, duration_ms=duration_ms)
+        return {"dragged_from": [fx, fy], "dragged_to": [tx, ty]}
+
+    def _drag_relative(self, p: dict, context: BackendContext) -> dict:
+        """Drag within a window using fractional coordinates.
+
+        Params:
+          window_title:     partial window title (uses focused window if empty)
+          from_x_pct:       drag start x as fraction of window width
+          from_y_pct:       drag start y as fraction of window height
+          to_x_pct:         drag end x as fraction of window width
+          to_y_pct:         drag end y as fraction of window height
+          button:           left | right | middle (default left)
+          duration_ms:      hold duration in ms (default 200)
+        """
+        title = p.get("window_title", "")
+        button = p.get("button", "left")
+        duration_ms = int(p.get("duration_ms", 200))
+
+        if title:
+            bounds = _get_window_bounds(title)
+            if bounds is None:
+                raise RuntimeError(f"drag_relative: window not found: '{title}'")
+            wx, wy = bounds["x"], bounds["y"]
+            ww, wh = bounds["width"], bounds["height"]
+        else:
+            _, monitor = _screenshot_as_array()
+            wx, wy = 0, 0
+            ww, wh = monitor["width"], monitor["height"]
+
+        fx = int(wx + ww * float(p.get("from_x_pct", 0.0)))
+        fy = int(wy + wh * float(p.get("from_y_pct", 0.0)))
+        tx = int(wx + ww * float(p.get("to_x_pct", 1.0)))
+        ty = int(wy + wh * float(p.get("to_y_pct", 1.0)))
+
+        _mouse_drag(fx, fy, tx, ty, button=button, duration_ms=duration_ms)
+        return {
+            "dragged_from": [fx, fy],
+            "dragged_to": [tx, ty],
+            "from_pct": [p.get("from_x_pct"), p.get("from_y_pct")],
+            "to_pct": [p.get("to_x_pct"), p.get("to_y_pct")],
+        }
+
     def _capture_region(self, p: dict, context: BackendContext) -> dict:
         """Screenshot a region of the screen and save as a template."""
         output_path = p.get("output", "")
@@ -562,7 +649,7 @@ class VisualAnchorBackend(Backend):
         }
 
 
-# ── pynput mouse helper ───────────────────────────────────────────────────────
+# ── pynput mouse helpers ──────────────────────────────────────────────────────
 
 def _mouse_click(x: int, y: int, button: str = "left", double: bool = False):
     """Move mouse to (x, y) and click."""
@@ -578,10 +665,66 @@ def _mouse_click(x: int, y: int, button: str = "left", double: bool = False):
     btn = btn_map.get(button.lower(), Button.left)
 
     ctrl.position = (x, y)
-    time.sleep(0.05)  # small settle delay
+    time.sleep(0.05)
     ctrl.press(btn)
     ctrl.release(btn)
     if double:
         time.sleep(0.08)
         ctrl.press(btn)
         ctrl.release(btn)
+
+
+def _mouse_drag(
+    fx: int, fy: int, tx: int, ty: int,
+    button: str = "left", duration_ms: int = 200
+):
+    """Press at (fx, fy), move to (tx, ty) over duration_ms, release.
+
+    Tries xdotool first (works with Qt5/KDE apps), falls back to pynput.
+    """
+    import shutil, subprocess, os
+
+    env = os.environ.copy()
+    if "DISPLAY" not in env:
+        env["DISPLAY"] = ":0"
+
+    if shutil.which("xdotool"):
+        # xdotool is more reliable with Qt5 apps
+        steps = max(5, duration_ms // 30)
+        subprocess.run(["xdotool", "mousemove", str(fx), str(fy)], env=env)
+        time.sleep(0.05)
+        subprocess.run(["xdotool", "mousedown", "1"], env=env)
+        time.sleep(0.05)
+        for i in range(1, steps + 1):
+            ix = int(fx + (tx - fx) * i / steps)
+            iy = int(fy + (ty - fy) * i / steps)
+            subprocess.run(["xdotool", "mousemove", str(ix), str(iy)], env=env)
+            time.sleep(duration_ms / 1000.0 / steps)
+        subprocess.run(["xdotool", "mousemove", str(tx), str(ty)], env=env)
+        time.sleep(0.05)
+        subprocess.run(["xdotool", "mouseup", "1"], env=env)
+        return
+
+    # Fallback: pynput
+    mouse_mod, _ = _require_pynput()
+    Button = mouse_mod.Button
+    ctrl = mouse_mod.Controller()
+    btn_map = {"left": Button.left, "right": Button.right, "middle": Button.middle}
+    btn = btn_map.get(button.lower(), Button.left)
+
+    ctrl.position = (fx, fy)
+    time.sleep(0.05)
+    ctrl.press(btn)
+    time.sleep(0.05)
+
+    steps = max(10, duration_ms // 20)
+    step_sleep = duration_ms / 1000.0 / steps
+    for i in range(1, steps + 1):
+        ix = int(fx + (tx - fx) * i / steps)
+        iy = int(fy + (ty - fy) * i / steps)
+        ctrl.position = (ix, iy)
+        time.sleep(step_sleep)
+
+    ctrl.position = (tx, ty)
+    time.sleep(0.05)
+    ctrl.release(btn)

@@ -21,3 +21,7 @@ macros:
   - name: gedit_find_and_replace
     path: demo/gedit_find_and_replace.yaml
     version: "1.0"
+  # ── Demo macros (flameshot) ───────────────────────────────────
+  - name: flameshot_annotate
+    path: demo/flameshot_annotate.yaml
+    version: "1.0"
