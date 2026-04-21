@@ -15,7 +15,7 @@ CLI-Anything: Bridging the Gap Between AI Agents and the World's Software</stron
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-5_min-blue?style=for-the-badge" alt="Quick Start"></a>
   <a href="https://hkuds.github.io/CLI-Anything/"><img src="https://img.shields.io/badge/CLI_Hub-Browse_%26_Install-ff69b4?style=for-the-badge" alt="CLI Hub"></a>
   <a href="#-demonstrations"><img src="https://img.shields.io/badge/Demos-32_Apps-green?style=for-the-badge" alt="Demos"></a>
-  <a href="#-test-results"><img src="https://img.shields.io/badge/Tests-2%2C185_Passing-brightgreen?style=for-the-badge" alt="Tests"></a>
+  <a href="#-test-results"><img src="https://img.shields.io/badge/Tests-2%2C192_Passing-brightgreen?style=for-the-badge" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License"></a>
 </p>
 
@@ -594,7 +594,7 @@ AI agents are great at reasoning but terrible at using real professional softwar
 | 💸 "UI automation breaks constantly" | No screenshots, no clicking, no RPA fragility. Pure command-line reliability with structured interfaces |
 | 📊 "Agents need structured data" | Built-in JSON output for seamless agent consumption + human-readable formats for debugging |
 | 🔧 "Custom integrations are expensive" | One Claude plugin auto-generates CLIs for ANY codebase through proven 7-phase pipeline |
-| ⚡ "Prototype vs Production gap" | 2,185+ tests with real software validation. Battle-tested across 32 major applications |
+| ⚡ "Prototype vs Production gap" | 2,192+ tests with real software validation. Battle-tested across 32 major applications |
 
 ---
 
@@ -970,7 +970,7 @@ Each application received complete, production-ready CLI interfaces — not demo
 <td>GPU Debugging & Profiling</td>
 <td><code>cli-anything-nsight-graphics</code></td>
 <td>Official ngfx / ngfx-capture orchestration + GPU Trace summary</td>
-<td align="center">✅ 33</td>
+<td align="center">✅ 40</td>
 </tr>
 <tr>
 <td align="center"><strong>🅲🅲 CloudCompare</strong></td>
@@ -1002,11 +1002,11 @@ Each application received complete, production-ready CLI interfaces — not demo
 </tr>
 <tr>
 <td align="center" colspan="4"><strong>Total</strong></td>
-<td align="center"><strong>✅ 2,185</strong></td>
+<td align="center"><strong>✅ 2,192</strong></td>
 </tr>
 </table>
 
-> **100% pass rate** across all 2,185 tests — 1,596 unit tests + 570 end-to-end tests + 19 Node.js tests.
+> **100% pass rate** across all 2,192 tests — 1,600 unit tests + 573 end-to-end tests + 19 Node.js tests.
 
 ---
 
@@ -1044,11 +1044,11 @@ ollama         98 passed  ✅   (87 unit + 11 e2e)
 sketch         19 passed  ✅   (19 jest, Node.js)
 renderdoc      59 passed  ✅   (45 unit + 14 e2e)
 cloudcompare   88 passed  ✅   (49 unit + 39 e2e)
-nsight-graphics 33 passed ✅   (32 unit + 1 e2e, 3 hardware-gated e2e skipped)
+nsight-graphics 40 passed ✅   (36 unit + 4 e2e)
 openscreen    101 passed  ✅   (78 unit + 23 e2e)
 cloudanalyzer  14 passed  ✅   (7 unit + 7 e2e)
 ──────────────────────────────────────────────────────────────────────────────
-TOTAL        2,185 passed  ✅   100% pass rate
+TOTAL        2,192 passed  ✅   100% pass rate
 ```
 
 ---
@@ -1127,7 +1127,7 @@ cli-anything/
 ├── ☁️ cloudcompare/agent-harness/       # CloudCompare CLI (88 tests)
 ├── 🔍 exa/agent-harness/               # Exa CLI (40 tests)
 └── ⛅ cloudanalyzer/agent-harness/      # CloudAnalyzer CLI (14 tests)
-├── 🟩 nsight-graphics/agent-harness/    # Nsight Graphics CLI (33 tests)
+├── 🟩 nsight-graphics/agent-harness/    # Nsight Graphics CLI (40 tests)
 ```
 
 Each `agent-harness/` contains an installable Python package under `cli_anything.<software>/` with Click CLI, core modules, utils (including `repl_skin.py` and backend wrapper), and comprehensive tests.
@@ -1353,7 +1353,7 @@ MIT License — free to use, modify, and distribute.
 
 **CLI-Anything** — *Make any software with a codebase Agent-native.*
 
-<sub>A methodology for the age of AI agents | 32 professional software demos | 2,185 passing tests</sub>
+<sub>A methodology for the age of AI agents | 32 professional software demos | 2,192 passing tests</sub>
 
 <br>
 
