@@ -272,8 +272,11 @@ assets/gen_typing_gif.py
 !/docs/PREVIEW_PROTOCOL.md
 !/docs/PREVIEW_PROGRESS.md
 !/docs/FREECAD_VIDEO_REFERENCE.md
+!/docs/PREVIEW_MECHANISM_PROGRESS.md
 !/docs/scripts/
 !/docs/scripts/**
+/docs/scripts/__pycache__/
+/docs/scripts/**/*.pyc
 !/docs/hub/
 /docs/hub/registry-dates.json
 !/docs/cli-matrix/
