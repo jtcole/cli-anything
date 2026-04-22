@@ -267,6 +267,25 @@ class TestObjects:
         set_object_property(proj, 0, "visible", "false")
         assert proj["objects"][0]["visible"] is False
 
+    def test_set_property_parent(self):
+        proj = self._make_scene()
+        parent = add_object(proj, name="Parent")
+        add_object(proj, name="Child")
+        set_object_property(proj, 1, "parent", 0)
+        assert proj["objects"][1]["parent"] == parent["id"]
+
+    def test_set_property_parent_invalid_index(self):
+        proj = self._make_scene()
+        add_object(proj, name="Child")
+        with pytest.raises(IndexError, match="Parent index 2 out of range"):
+            set_object_property(proj, 0, "parent", 2)
+
+    def test_set_property_parent_self(self):
+        proj = self._make_scene()
+        add_object(proj, name="Solo")
+        with pytest.raises(ValueError, match="cannot be its own parent"):
+            set_object_property(proj, 0, "parent", 0)
+
     def test_set_property_invalid(self):
         proj = self._make_scene()
         add_object(proj)

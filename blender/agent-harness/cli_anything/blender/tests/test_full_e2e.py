@@ -353,6 +353,15 @@ class TestBPYScriptGeneration:
         script = generate_full_script(proj, "/tmp/render.png")
         assert "materials.append" in script
 
+    def test_script_contains_parenting(self):
+        proj = create_scene()
+        parent = add_object(proj, mesh_type="empty", name="RigRoot")
+        add_object(proj, name="ChildCube")
+        proj["objects"][1]["parent"] = parent["id"]
+        script = generate_full_script(proj, "/tmp/render.png")
+        assert "child_obj.parent = parent_obj" in script
+        assert "matrix_parent_inverse" in script
+
     def test_render_scene_creates_script_file(self, tmp_dir):
         proj = create_scene()
         add_object(proj, name="Cube")

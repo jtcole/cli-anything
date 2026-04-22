@@ -117,9 +117,11 @@ What was added:
   - hidden background `preview live monitor --session-dir ...`
   - saved scene JSON fingerprint polling with automatic preview recapture
   - demo tooling for `blender`:
-  - `docs/scripts/blender_gyro_observatory_demo.py`
-  - scenario:
-    - `gyro-observatory`
+  - `docs/scripts/blender_orbital_relay_drone_demo.py`
+  - scenarios:
+    - `orbital-relay-drone`
+    - real staged preview bundles
+    - real turntable motion video
 - `cli-hub` live viewer surface:
   - `preview inspect` now understands live sessions
   - `preview html` now renders live-session HTML
