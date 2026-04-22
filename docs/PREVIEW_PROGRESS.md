@@ -40,8 +40,11 @@ The current shape is:
 
 ## New In This Iteration
 
-The preview branch now has working first-pass live popup preview loops for
-`shotcut` and `freecad`.
+The preview branch now has working live popup preview loops for:
+
+- `shotcut`
+- `freecad`
+- `blender`
 
 The current FreeCAD demo selection notes now live in:
 
@@ -104,6 +107,19 @@ What was added:
     - `orbital-relay`
     - `empire-state-building`
     - `taipei-101`
+- `blender` live session lifecycle:
+  - `preview live start`
+  - `preview live push`
+  - `preview live status`
+  - `preview live stop`
+- `blender` producer-side auto polling:
+  - `preview live start --mode poll --source-poll-ms ...`
+  - hidden background `preview live monitor --session-dir ...`
+  - saved scene JSON fingerprint polling with automatic preview recapture
+  - demo tooling for `blender`:
+  - `docs/scripts/blender_gyro_observatory_demo.py`
+  - scenario:
+    - `gyro-observatory`
 - `cli-hub` live viewer surface:
   - `preview inspect` now understands live sessions
   - `preview html` now renders live-session HTML
@@ -134,6 +150,12 @@ This is the intended cross-software direction.
 - `blender`
   - preview implementation works
   - preview E2E passes
+  - live preview session lifecycle now works end-to-end
+  - automatic poll mode now works end-to-end without manual `preview live push`
+  - a real stage-by-stage `gyro-observatory` build now exists with:
+    - 4 preview bundle checkpoints
+    - a persisted live session
+    - a final 1600x1600 Blender still render
 - `freecad`
   - preview implementation works on the current Ubuntu machine after local
     environment setup
@@ -225,6 +247,12 @@ Useful local verification outputs currently available:
 - consolidated final artifacts:
   - `/root/preview-artifacts/20260420/final/freecad-preview.png`
   - `/root/preview-artifacts/20260420/final/renderdoc-preview.png`
+- Blender Gyro Observatory artifacts:
+  - `/root/preview-artifacts/20260422/blender-gyro-observatory/gyro_observatory.blend-cli.json`
+  - `/root/preview-artifacts/20260422/blender-gyro-observatory/live-root/blender/live/gyro-observatory-blend-cli-0043d42f-quick/session.json`
+  - `/root/preview-artifacts/20260422/blender-gyro-observatory/live-root/blender/quick/20260422T123252Z_a0409b02_quick/artifacts/hero.png`
+  - `/root/preview-artifacts/20260422/blender-gyro-observatory/live.html`
+  - `/root/preview-artifacts/20260422/blender-gyro-observatory/renders/gyro_observatory_final.png`
 - FreeCAD live poll demo artifacts:
   - `/root/preview-artifacts/20260421/freecad-live-demo/live-root/freecad/live/project-379d4e4a-quick/session.json`
   - `/root/preview-artifacts/20260421/freecad-live-demo/live-root/freecad/quick/20260421T051634Z_88a6b6d6_quick/artifacts/hero.png`

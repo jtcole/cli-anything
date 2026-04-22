@@ -81,9 +81,10 @@ The current mechanism is built as five layers:
   - bundle emission
 
 - `blender`
-  - preview capture support exists
-  - current branch contains first-pass implementation only
-  - next active work should continue here
+  - preview capture
+  - live session
+  - poll-mode auto refresh
+  - real Gyro Observatory demo script with stage-by-stage preview checkpoints
 
 - `freecad`
   - quick preview capture
@@ -155,12 +156,12 @@ Current limits:
 - FreeCAD motion is currently part-placement driven, not Assembly-joint driven
 - RenderDoc preview is limited by machine graphics/runtime constraints when
   generating fresh captures locally
-- Blender preview has the least polish among the currently implemented preview
-  pilots and is the most obvious next target
+- Blender now has live preview parity at the protocol/session level, but its
+  showcase/demo tooling is still shallower than FreeCAD's motion/video stack
 
 ## Recommended Next Work
 
-1. Continue Blender previewing on top of this checkpoint.
+1. Expand Blender demo tooling beyond the first Gyro Observatory proof point.
 2. Restack this preview branch onto a clean `origin/main` base before the PR
    stack grows larger.
 3. Split this large checkpoint into a reviewable commit stack later:
