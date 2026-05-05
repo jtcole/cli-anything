@@ -23,6 +23,8 @@
 /.github/*
 !/.github/workflows/
 !/.github/scripts/
+!/.github/CODEOWNERS
+!/.github/labeler.yml
 !/.github/PULL_REQUEST_TEMPLATE.md
 !/.github/ISSUE_TEMPLATE/
 
@@ -82,6 +84,9 @@
 !/unrealinsights/
 !/nsight-graphics/
 !/lldb/
+!/macrocli/
+!/sbox/
+!/quietshrink/
 
 # Step 5: Inside each software dir, ignore everything (including dotfiles)
 /gimp/*
@@ -170,6 +175,12 @@
 /nsight-graphics/.*
 /lldb/*
 /lldb/.*
+/macrocli/*
+/macrocli/.*
+/sbox/*
+/sbox/.*
+/quietshrink/*
+/quietshrink/.*
 
 # Step 6: ...except agent-harness/
 !/gimp/agent-harness/
@@ -221,6 +232,15 @@
 !/unrealinsights/agent-harness/
 !/nsight-graphics/agent-harness/
 !/lldb/agent-harness/
+!/macrocli/agent-harness/
+!/sbox/agent-harness/
+!/quietshrink/agent-harness/
+
+# Exclude non-gedit demo macros from macrocli (local only)
+/macrocli/agent-harness/cli_anything/macrocli/macro_definitions/demo/flameshot*
+/macrocli/agent-harness/cli_anything/macrocli/macro_definitions/demo/kolourpaint*
+/macrocli/agent-harness/cli_anything/macrocli/macro_definitions/demo/snapshots/
+
 
 # Step 7: Ignore build artifacts within allowed dirs
 **/__pycache__/
