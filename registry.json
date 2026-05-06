@@ -1080,8 +1080,12 @@
       "entry_point": "cli-anything-hacker-feeds-cli",
       "skill_md": "https://github.com/collectivewinca/hacker-feeds-cli/blob/main/cli_anything/hacker_feeds_cli/skills/SKILL.md",
       "category": "search",
-      "contributor": "collectivewinca",
-      "contributor_url": "https://github.com/collectivewinca"
+      "contributors": [
+        {
+          "name": "collectivewinca",
+          "url": "https://github.com/collectivewinca"
+        }
+      ]
     }
   ]
 }
